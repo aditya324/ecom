@@ -1,0 +1,58 @@
+Both of these are finished by a setup step in Razorpay and one change in how a renewal order cancels. The pages themselves already record the payment when the webhook arrives.
+
+Later subscription charges
+
+Razorpay has to reach this app from the internet. Localhost cannot receive that call.
+
+Leave the site running at http://localhost:8000.
+Open a tunnel to that port, for example ngrok http 8000. The tunnel gives you an https address.
+In the Razorpay dashboard, in test mode, add a webhook. The URL is that address plus /payments/razorpay/webhook.
+Turn on these events: payment.captured, subscription.charged, subscription.pending, subscription.halted, subscription.cancelled, subscription.completed, and refund.processed.
+Set a webhook secret in that form, then put the same value in RAZORPAY_WEBHOOK_SECRET in .env and restart the app. If that line is left empty, Razorpay must sign with the same secret as RAZORPAY_KEY_SECRET.
+On the test subscription, use Charge this now. A new placed order appears, with renewal in the duration, and the profile shows it.
+The tunnel address changes each time you start it, so the dashboard URL has to be updated to match.
+
+Stopping renewals from a renewal order
+
+Refund on a renewal order already returns that one charge. Cancel does not stop the subscription, because the subscription row is stored on the first order. On a renewal, Cancel treats the order as a one-time payment and refunds it.
+
+To finish that, the renewal order needs to point at the same subscription. Then Cancel on the renewal calls Razorpay to stop future charges, and the money already taken stays paid until you refund it. The button on the original order can stay as it is.
+
+I can wire that link so Cancel on a renewal order stops the subscription.
+
+
+On CloudPanel the site is already public, so Razorpay can call it directly. I’ll match the steps to this app’s webhook route and secret.
+
+CloudPanel does not need a tunnel. Razorpay calls your live site over HTTPS. The webhook address for this app is:
+
+https://your-domain.com/payments/razorpay/webhook
+
+That path is already public and excluded from the CSRF check.
+
+On the server
+
+In CloudPanel, open the site and confirm the document root is the Laravel public folder, and that SSL is on. Razorpay only sends webhooks to https.
+In that site’s .env, set APP_URL to https://your-domain.com.
+Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to the keys for the same mode you will use in the dashboard (test or live).
+Choose a webhook secret and set RAZORPAY_WEBHOOK_SECRET to that exact value. If you leave it empty, this app signs with RAZORPAY_KEY_SECRET instead, and the dashboard secret must be that same key secret.
+From the site directory, run php artisan config:clear so the new .env values are loaded. Use the site user CloudPanel shows for that site, not root, if the panel runs PHP as that user.
+In Razorpay
+
+Open the dashboard in the same mode as those keys.
+Go to Account & Settings → Webhooks → Add new webhook.
+Paste the URL above.
+Paste the same secret you put in RAZORPAY_WEBHOOK_SECRET.
+Enable these events:
+payment.captured
+subscription.charged
+subscription.pending
+subscription.halted
+subscription.cancelled
+subscription.completed
+refund.processed
+Save the webhook.
+Check it
+
+Razorpay’s webhook page shows each delivery. A matching secret returns 204. 400 means the secret does not match. 404 means the URL or document root is wrong. 419 means the deployed code is missing the CSRF exception for payments/razorpay/webhook.
+
+After it is active, Charge this now on a test subscription creates a new placed order whose duration includes renewal

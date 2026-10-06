@@ -84,14 +84,43 @@ document.querySelectorAll('[data-header-search]').forEach((form) => {
     });
 
     input.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
+        if (event.key === 'Escape' && !panel.hidden) {
             close();
+            event.stopPropagation();
         }
     });
 
     document.addEventListener('click', (event) => {
         if (!form.contains(event.target)) {
             close();
+        }
+    });
+});
+
+document.querySelectorAll('[data-store-menu]').forEach((menu) => {
+    const openButton = document.querySelector('[data-store-menu-open]');
+
+    const setOpen = (open) => {
+        menu.hidden = !open;
+        openButton?.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('overflow-hidden', open);
+    };
+
+    openButton?.addEventListener('click', () => setOpen(true));
+
+    menu.querySelectorAll('[data-store-menu-close]').forEach((button) => {
+        button.addEventListener('click', () => setOpen(false));
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !menu.hidden) {
+            setOpen(false);
+        }
+    });
+
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', (event) => {
+        if (event.matches) {
+            setOpen(false);
         }
     });
 });
@@ -355,7 +384,7 @@ document.querySelectorAll('[data-catalog-filters]').forEach((form) => {
         }
 
         paint();
-        form.requestSubmit();
+        document.getElementById('catalog-filters')?.requestSubmit();
     };
 
     minRange?.addEventListener('input', paint);
@@ -363,6 +392,30 @@ document.querySelectorAll('[data-catalog-filters]').forEach((form) => {
     minRange?.addEventListener('change', commitRange);
     maxRange?.addEventListener('change', commitRange);
     paint();
+
+    const panel = form.querySelector('[data-catalog-panel]');
+    const openButton = form.querySelector('[data-catalog-panel-open]');
+    const desktop = window.matchMedia('(min-width: 1024px)');
+
+    const setOpen = (open) => {
+        panel?.classList.toggle('max-lg:hidden', !open);
+        openButton?.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('overflow-hidden', open && !desktop.matches);
+    };
+
+    openButton?.addEventListener('click', () => setOpen(true));
+
+    panel?.querySelectorAll('[data-catalog-panel-close]').forEach((button) => {
+        button.addEventListener('click', () => setOpen(false));
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && openButton?.getAttribute('aria-expanded') === 'true') {
+            setOpen(false);
+        }
+    });
+
+    desktop.addEventListener('change', () => setOpen(false));
 });
 
 document.querySelectorAll('[data-point-list]').forEach((list) => {

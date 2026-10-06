@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 #[Fillable([
     'service_id',
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'status',
     'quoted_price',
     'reply',
+    'pay_token',
 ])]
 class Quote extends Model
 {
@@ -42,6 +45,28 @@ class Quote extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return HasMany<Order, $this>
+     */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function paidOrder(): ?Order
+    {
+        return $this->orders()->whereIn('status', Order::settledStatuses())->first();
+    }
+
+    public static function makePayToken(): string
+    {
+        do {
+            $token = Str::lower(Str::random(40));
+        } while (static::query()->where('pay_token', $token)->exists());
+
+        return $token;
     }
 
     public function money(): ?string

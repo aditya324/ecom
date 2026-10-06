@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\InvoiceMail;
+use App\Mail\OrderProgressMail;
 use App\Mail\RefundMail;
 use App\Models\Order;
-use App\Models\Subscription;
 use App\Support\AdminFilter;
 use App\Support\Razorpay;
 use Illuminate\Http\RedirectResponse;
@@ -47,9 +47,11 @@ class OrderController extends Controller
         }
 
         if ($filters['kind'] === 'subscription') {
-            $orders->whereHas('subscriptions');
+            $orders->where(function ($query): void {
+                $query->whereHas('subscriptions')->orWhereNotNull('subscription_id');
+            });
         } elseif ($filters['kind'] === 'once') {
-            $orders->whereDoesntHave('subscriptions');
+            $orders->whereDoesntHave('subscriptions')->whereNull('subscription_id');
         }
 
         if ($filters['min'] !== null) {
@@ -80,7 +82,7 @@ class OrderController extends Controller
 
     public function show(Order $order): View
     {
-        $order->load(['items', 'subscriptions']);
+        $order->load(['items', 'subscriptions', 'linkedSubscription']);
 
         return view('admin.orders.show', [
             'order' => $order,
@@ -98,12 +100,23 @@ class OrderController extends Controller
             'customer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $note = trim((string) ($data['customer_note'] ?? '')) ?: null;
+        $changed = $order->status !== $data['status'] || $order->customer_note !== $note;
+
         $order->update([
             'status' => $data['status'],
-            'customer_note' => trim((string) ($data['customer_note'] ?? '')) ?: null,
+            'customer_note' => $note,
         ]);
 
-        return back()->with('status', 'Order updated.');
+        if (! $changed) {
+            return back()->with('status', 'Order updated.');
+        }
+
+        if (! OrderProgressMail::deliver($order->fresh())) {
+            return back()->with('status', 'Order updated.')->withErrors(['order' => 'The update email was not sent.']);
+        }
+
+        return back()->with('status', 'Order updated. '.$order->email.' was emailed.');
     }
 
     public function invoice(Order $order): RedirectResponse
@@ -138,8 +151,7 @@ class OrderController extends Controller
 
     public function cancel(Request $request, Order $order, Razorpay $razorpay): RedirectResponse
     {
-        $order->load('subscriptions');
-        $subscriptions = $order->subscriptions->filter(fn (Subscription $subscription) => $subscription->canManage());
+        $subscriptions = $order->manageableSubscriptions();
 
         if ($subscriptions->isEmpty()) {
             $request->merge(['part' => 'once']);

@@ -4,10 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\AdminLoginRequest;
-use App\Models\CartItem;
 use App\Models\Order;
-use App\Models\Quote;
-use App\Models\Service;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -48,9 +45,6 @@ class AdminLoginController extends Controller
     {
         return response()->view('admin.home', [
             'collected' => Order::collected(),
-            'newQuotes' => Quote::query()->where('status', 'new')->count(),
-            'openCarts' => (int) CartItem::query()->selectRaw('count(distinct user_id) as aggregate')->value('aggregate'),
-            'hiddenServices' => Service::query()->where('is_active', false)->count(),
         ]);
     }
 }

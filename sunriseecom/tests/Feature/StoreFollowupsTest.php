@@ -1,6 +1,9 @@
 <?php
 
+use App\Mail\OrderProgressMail;
 use App\Mail\RefundMail;
+use App\Mail\SupportReceivedMail;
+use App\Mail\SupportReplyMail;
 use App\Models\Admin;
 use App\Models\Business;
 use App\Models\Order;
@@ -29,6 +32,8 @@ test('an admin can mark an order in progress and leave a note', function () {
         'total' => 118,
     ]);
 
+    Mail::fake();
+
     $this->actingAs($admin, 'admin')
         ->put(route('admin.orders.update', $order), [
             'status' => 'in_progress',
@@ -36,6 +41,10 @@ test('an admin can mark an order in progress and leave a note', function () {
         ])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
+
+    Mail::assertSent(OrderProgressMail::class, function (OrderProgressMail $mail) use ($order, $user) {
+        return $mail->order->is($order) && $mail->hasTo($user->email);
+    });
 
     $this->actingAs($user)
         ->get(route('orders.show', $order))
@@ -136,6 +145,23 @@ test('a package has its own page and a buyer can review it', function () {
         ->assertSee('The package covered the launch.');
 });
 
+test('a new support message is emailed to the business', function () {
+    Mail::fake();
+
+    $this->post(route('support.store'), [
+        'name' => 'Asha Menon',
+        'email' => 'asha@example.com',
+        'body' => 'Where is order SR-1?',
+    ])->assertRedirect(route('support'));
+
+    Mail::assertSent(SupportReceivedMail::class, function (SupportReceivedMail $mail) {
+        $mail->assertSeeInHtml('Where is order SR-1?');
+        $mail->assertSeeInHtml(route('admin.support.show', $mail->supportMessage));
+
+        return $mail->hasTo('support@sunrisedigital.co.in');
+    });
+});
+
 test('a saved state is reused at checkout and a support message reaches admin', function () {
     $user = User::factory()->create([
         'billing_state' => 'Karnataka',
@@ -158,10 +184,31 @@ test('a saved state is reused at checkout and a support message reaches admin', 
 
     expect(SupportMessage::query()->where('email', 'asha@example.com')->exists())->toBeTrue();
 
-    $this->actingAs(Admin::factory()->create(), 'admin')
+    $admin = Admin::factory()->create();
+
+    $this->actingAs($admin, 'admin')
         ->get(route('admin.support.index'))
         ->assertOk()
         ->assertSee('Where is order SR-1?');
+
+    $message = SupportMessage::query()->where('email', 'asha@example.com')->firstOrFail();
+
+    $this->get(route('admin.support.show', $message))
+        ->assertOk()
+        ->assertSee('Where is order SR-1?');
+
+    expect($message->fresh()->status)->toBe('read');
+
+    Mail::fake();
+
+    $this->put(route('admin.support.update', $message), [
+        'reply' => 'It is in progress and will be delivered this week.',
+    ])->assertRedirect(route('admin.support.index'));
+
+    expect($message->fresh()->status)->toBe('replied')
+        ->and($message->fresh()->reply)->toBe('It is in progress and will be delivered this week.');
+
+    Mail::assertSent(SupportReplyMail::class, fn (SupportReplyMail $mail) => $mail->hasTo('asha@example.com'));
 });
 
 test('business details and ended deals are filled in', function () {

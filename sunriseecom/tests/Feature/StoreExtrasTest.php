@@ -12,6 +12,28 @@ use Illuminate\Support\Facades\Mail;
 
 uses(RefreshDatabase::class);
 
+test('the header menu holds wishlist cart and account', function () {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Menu', false)
+        ->assertSee(route('wishlist.index'), false)
+        ->assertSee(route('cart.index'), false)
+        ->assertSee(route('login'), false)
+        ->assertDontSee(route('profile.edit'), false);
+
+    $user = User::factory()->create(['name' => 'Asha Rao']);
+
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('Asha Rao')
+        ->assertSee('Profile')
+        ->assertSee('Orders')
+        ->assertSee('Log out')
+        ->assertSee(route('profile.edit'), false)
+        ->assertSee(route('profile.orders'), false);
+});
+
 test('the footer pages and home links are real', function () {
     $this->get(route('about'))->assertOk()->assertSee('About Us');
     $this->get(route('privacy'))->assertOk()->assertSee('Privacy Policy');
@@ -21,6 +43,7 @@ test('the footer pages and home links are real', function () {
         ->assertOk()
         ->assertSee(route('categories.index'), false)
         ->assertSee(route('home').'#packages', false)
+        ->assertSee(asset('assets/logo/favicon.png'), false)
         ->assertSee('https://sunrisedigital.co.in/about.php', false)
         ->assertSee('https://sunrisedigital.co.in/career.php', false)
         ->assertSee('https://sunrisedigital.co.in/contact-us.php', false)

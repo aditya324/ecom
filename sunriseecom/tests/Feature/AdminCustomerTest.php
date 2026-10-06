@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Quote;
 use App\Models\Service;
 use App\Models\Subscription;
+use App\Models\SupportMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -92,4 +93,62 @@ test('an admin can browse a customer and their orders and subscriptions', functi
         ->assertSee('Hidden services')
         ->assertSee((string) $hidden)
         ->assertSee('1', false);
+});
+
+test('the admin overview and sidebar count orders quotes and support that are waiting', function () {
+    $admin = Admin::factory()->create();
+    $user = User::factory()->create();
+    $service = Service::query()->where('is_active', true)->firstOrFail();
+
+    Order::query()->create([
+        'number' => 'SR-WAIT01',
+        'user_id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'status' => 'placed',
+        'discount' => 0,
+        'gst' => 0,
+        'total' => 100,
+    ]);
+    Order::query()->create([
+        'number' => 'SR-WAIT02',
+        'user_id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'status' => 'in_progress',
+        'discount' => 0,
+        'gst' => 0,
+        'total' => 100,
+    ]);
+    Quote::query()->create([
+        'service_id' => $service->id,
+        'name' => 'Asha',
+        'email' => 'asha@example.com',
+        'message' => 'Need a price.',
+        'status' => 'new',
+    ]);
+    SupportMessage::query()->create([
+        'name' => 'Asha',
+        'email' => 'asha@example.com',
+        'body' => 'Where is the order?',
+        'status' => 'new',
+    ]);
+    SupportMessage::query()->create([
+        'name' => 'Meera',
+        'email' => 'meera@example.com',
+        'body' => 'Already answered.',
+        'status' => 'replied',
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->get(route('admin.home'))
+        ->assertOk()
+        ->assertSee('Orders waiting')
+        ->assertSee('New messages')
+        ->assertSee('Orders, 1 waiting', false)
+        ->assertSee('Quotes, 1 waiting', false)
+        ->assertSee('Support, 1 waiting', false)
+        ->assertDontSee('Categories,', false)
+        ->assertDontSee('Customers,', false)
+        ->assertDontSee('Services,', false);
 });

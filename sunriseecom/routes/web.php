@@ -77,6 +77,7 @@ Route::middleware('auth')->group(function () {
 Route::get('/services/{service}', [ServiceController::class, 'show'])->name('services.show');
 Route::get('/services/{service}/quote', [QuoteController::class, 'create'])->name('quotes.create');
 Route::post('/services/{service}/quote', [QuoteController::class, 'store'])->name('quotes.store');
+Route::get('/quotes/pay/{token}', [QuoteController::class, 'pay'])->name('quotes.pay');
 Route::get('/deals', function () {
     return view('store.deals');
 })->name('deals');
@@ -96,6 +97,9 @@ Route::middleware('guest')->group(function () {
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
 });
 
+Route::get('/payments/razorpay/webhook', function () {
+    return response('Razorpay webhook endpoint. Payment events are accepted by POST.');
+});
 Route::post('/payments/razorpay/webhook', [CheckoutController::class, 'webhook'])->name('payments.razorpay.webhook');
 
 Route::post('/login', [LoginController::class, 'store']);
@@ -137,6 +141,8 @@ Route::middleware('auth:admin')->prefix('admin')->name('admin.')->group(function
     Route::delete('/reviews/{review}', [AdminReviewController::class, 'destroy'])->name('reviews.destroy');
 
     Route::get('/support', [AdminSupportController::class, 'index'])->name('support.index');
+    Route::get('/support/{message}', [AdminSupportController::class, 'show'])->name('support.show');
+    Route::put('/support/{message}', [AdminSupportController::class, 'update'])->name('support.update');
 
     Route::get('/business', [AdminBusinessController::class, 'edit'])->name('business.edit');
     Route::put('/business', [AdminBusinessController::class, 'update'])->name('business.update');

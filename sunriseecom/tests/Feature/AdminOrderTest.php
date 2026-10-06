@@ -210,6 +210,66 @@ test('the admin orders page totals every order after refunds', function () {
         ->assertSee('₹7,000');
 });
 
+test('cancel on a renewal order stops the subscription', function () {
+    $admin = Admin::factory()->create();
+    $user = User::factory()->create();
+    $original = Order::query()->create([
+        'number' => 'SR-ORIG01',
+        'user_id' => $user->id,
+        'name' => 'Asha Menon',
+        'email' => 'asha@example.com',
+        'status' => 'placed',
+        'razorpay_payment_id' => 'pay_first',
+        'discount' => 0,
+        'gst' => 180,
+        'total' => 1180,
+    ]);
+    $subscription = Subscription::query()->create([
+        'user_id' => $user->id,
+        'order_id' => $original->id,
+        'name' => 'Instagram Marketing',
+        'period' => 'monthly',
+        'total_count' => 6,
+        'paid_count' => 2,
+        'cycle_amount' => 1180,
+        'status' => 'active',
+        'razorpay_subscription_id' => 'sub_renew_cancel',
+        'razorpay_payment_id' => 'pay_first',
+    ]);
+    $renewal = Order::query()->create([
+        'number' => 'SR-RENW01',
+        'user_id' => $user->id,
+        'subscription_id' => $subscription->id,
+        'name' => 'Asha Menon',
+        'email' => 'asha@example.com',
+        'status' => 'placed',
+        'razorpay_payment_id' => 'pay_second',
+        'discount' => 0,
+        'gst' => 180,
+        'total' => 1180,
+    ]);
+
+    Http::fake([
+        'api.razorpay.com/*' => Http::response(['status' => 'cancelled']),
+    ]);
+
+    $this->actingAs($admin, 'admin')
+        ->get(route('admin.orders.show', $renewal))
+        ->assertOk()
+        ->assertSee('Cancel subscription')
+        ->assertDontSee('Cancel order');
+
+    $this->post(route('admin.orders.cancel', $renewal))
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Subscription cancelled. The charge already taken is still paid until you refund it.');
+
+    expect($subscription->fresh()->status)->toBe('cancelled')
+        ->and($renewal->fresh()->status)->toBe('placed');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/subscriptions/sub_renew_cancel/cancel')
+        && ! str_contains($request->url(), '/refund'));
+});
+
 test('a customer cannot refund or cancel from the admin order page', function () {
     $order = Order::query()->create([
         'number' => 'SR-NOPE01',

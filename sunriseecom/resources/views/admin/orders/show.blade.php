@@ -19,7 +19,7 @@
 
     @php
         $parts = $order->paymentParts();
-        $subscription = $order->subscriptions->first(fn ($item) => $item->canManage());
+        $subscription = $order->manageableSubscriptions()->first();
     @endphp
     @if (in_array($order->status, ['placed', 'in_progress', 'delivered'], true))
         <form method="POST" action="{{ route('admin.orders.update', $order) }}" class="mt-6 max-w-xl rounded-2xl border border-[#ebe6df] bg-white p-5">

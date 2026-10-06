@@ -69,6 +69,11 @@ class QuoteController extends Controller
             'reply',
         ]));
         $quote->status = 'replied';
+
+        if ($quote->pay_token === null) {
+            $quote->pay_token = Quote::makePayToken();
+        }
+
         $quote->load('service');
 
         try {

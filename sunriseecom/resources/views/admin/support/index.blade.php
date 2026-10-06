@@ -17,14 +17,14 @@
         'noun' => 'message',
         'fields' => [
             ['name' => 'q', 'type' => 'search', 'label' => 'Search', 'placeholder' => 'Name, email, or message'],
-            ['name' => 'status', 'type' => 'select', 'label' => 'Status', 'options' => ['' => 'New and read', 'new' => 'New', 'read' => 'Read']],
+            ['name' => 'status', 'type' => 'select', 'label' => 'Status', 'options' => ['' => 'All', 'new' => 'New', 'read' => 'Read', 'replied' => 'Replied']],
         ],
     ])
 
     <div class="mt-6 flex flex-col gap-3">
         @forelse ($messages as $message)
             <article class="rounded-2xl border border-[#ebe6df] bg-white px-5 py-4">
-                <p class="text-sm font-semibold text-[#1a1a1a]">{{ $message->name }} · {{ $message->email }}</p>
+                <p class="text-sm font-semibold text-[#1a1a1a]"><a href="{{ route('admin.support.show', $message) }}" class="underline">{{ $message->name }}</a> · {{ $message->email }}</p>
                 <p class="mt-1 text-xs text-[#8a8680]">{{ $message->created_at->format('j M Y, g:i A') }} · {{ ucfirst($message->status) }}</p>
                 <p class="mt-3 text-sm leading-6 text-[#3a3632]">{{ $message->body }}</p>
             </article>

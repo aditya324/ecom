@@ -12,7 +12,11 @@
         <p style="margin:12px 0 0;font-size:15px;line-height:1.6;">Sunrise replied to your request.</p>
         <p style="margin:20px 0 0;font-size:15px;">Price</p>
         <p style="margin:4px 0 0;font-size:28px;font-weight:700;">{{ $quote->money() }}</p>
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#6f6a64;">18% GST is added when you pay.</p>
         <p style="margin:20px 0 0;font-size:15px;line-height:1.6;white-space:pre-line;">{{ $quote->reply }}</p>
+        @if ($quote->pay_token)
+            <p style="margin:24px 0 0;"><a href="{{ route('quotes.pay', $quote->pay_token) }}" style="color:#1a1a1a;">Pay this quote</a></p>
+        @endif
     </div>
 </body>
 </html>

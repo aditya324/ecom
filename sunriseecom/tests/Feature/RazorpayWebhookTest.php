@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\SubscriptionPaymentMail;
 use App\Models\Order;
 use App\Models\Service;
 use App\Models\Subscription;
@@ -7,6 +8,7 @@ use App\Models\User;
 use App\Support\Bill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
@@ -30,6 +32,12 @@ function postRazorpayWebhook(string $event, array $payload): TestResponse
         'HTTP_X-Razorpay-Signature' => hash_hmac('sha256', $body, 'test-secret'),
     ], $body);
 }
+
+test('opening the razorpay webhook in a browser is accepted', function () {
+    $this->get(route('payments.razorpay.webhook'))
+        ->assertOk()
+        ->assertSee('Payment events are accepted by POST.');
+});
 
 test('a subscription charge finishes the order when the browser never confirms it', function () {
     $service = Service::query()->where('slug', 'instagram-marketing')->firstOrFail();
@@ -111,9 +119,12 @@ test('a later subscription charge is a new order on the profile', function () {
 
     $renewal = Order::query()->where('razorpay_payment_id', 'pay_second')->firstOrFail();
 
+    $subscription = Subscription::query()->firstOrFail();
+
     expect(Order::query()->where('status', 'placed')->count())->toBe(2)
         ->and($renewal->items->first()->duration_label)->toContain('renewal')
-        ->and(Subscription::query()->first()->paid_count)->toBe(2);
+        ->and($renewal->subscription_id)->toBe($subscription->id)
+        ->and($subscription->paid_count)->toBe(2);
 
     $this->get(route('profile.orders'))
         ->assertOk()
@@ -171,6 +182,8 @@ test('a processed refund shows on the profile', function () {
 });
 
 test('a failed renewal is shown and the customer can cancel it', function () {
+    Mail::fake();
+
     $user = User::factory()->create();
     $order = Order::query()->create([
         'number' => 'SR-HALT01',
@@ -209,11 +222,42 @@ test('a failed renewal is shown and the customer can cancel it', function () {
         ->assertSee('Payment failed')
         ->assertSee('https://rzp.io/i/halt', false);
 
+    Mail::assertSent(SubscriptionPaymentMail::class, function (SubscriptionPaymentMail $mail) {
+        $mail->assertSeeInHtml('https://rzp.io/i/halt');
+        $mail->assertSeeInHtml('did not go through');
+
+        return $mail->hasTo('asha@example.com')
+            && $mail->envelope()->subject === 'Payment failed for Instagram Marketing';
+    });
+
+    postRazorpayWebhook('subscription.pending', [
+        'subscription' => ['entity' => [
+            'id' => 'sub_halt',
+            'status' => 'pending',
+            'short_url' => 'https://rzp.io/i/halt',
+        ]],
+    ])->assertNoContent();
+
+    Mail::assertSent(SubscriptionPaymentMail::class, 1);
+
     postRazorpayWebhook('subscription.halted', [
         'subscription' => ['entity' => ['id' => 'sub_halt', 'status' => 'halted']],
     ])->assertNoContent();
 
     expect($subscription->fresh()->status)->toBe('halted');
+
+    Mail::assertSent(SubscriptionPaymentMail::class, function (SubscriptionPaymentMail $mail) {
+        if ($mail->subscription->status !== 'halted') {
+            return false;
+        }
+
+        $mail->assertSeeInHtml('https://rzp.io/i/halt');
+        $mail->assertSeeInHtml('stopped further charges');
+
+        return $mail->hasTo('asha@example.com')
+            && $mail->envelope()->subject === 'Renewals stopped for Instagram Marketing';
+    });
+    Mail::assertSent(SubscriptionPaymentMail::class, 2);
 
     Http::fake([
         'api.razorpay.com/*' => Http::response(['status' => 'cancelled']),

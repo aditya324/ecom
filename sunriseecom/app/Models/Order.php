@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'number',
     'user_id',
+    'subscription_id',
+    'quote_id',
     'name',
     'email',
     'billing_address',
@@ -164,6 +167,42 @@ class Order extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The subscription a renewal charge belongs to. The subscription row itself
+     * stays on the first order.
+     *
+     * @return BelongsTo<Subscription, $this>
+     */
+    public function linkedSubscription(): BelongsTo
+    {
+        return $this->belongsTo(Subscription::class, 'subscription_id');
+    }
+
+    /**
+     * @return BelongsTo<Quote, $this>
+     */
+    public function quote(): BelongsTo
+    {
+        return $this->belongsTo(Quote::class);
+    }
+
+    /**
+     * @return Collection<int, Subscription>
+     */
+    public function manageableSubscriptions(): Collection
+    {
+        $this->loadMissing(['subscriptions', 'linkedSubscription']);
+
+        return $this->subscriptions
+            ->filter(fn (Subscription $subscription) => $subscription->canManage())
+            ->when(
+                $this->linkedSubscription?->canManage(),
+                fn (Collection $subscriptions) => $subscriptions->push($this->linkedSubscription),
+            )
+            ->unique('id')
+            ->values();
     }
 
     public function money(): string

@@ -2,10 +2,10 @@
     <div class="mx-auto w-full container px-6 py-14 sm:px-8 sm:py-16">
         <div class="flex items-end justify-between gap-6">
             <div>
-                <h2 id="shop-by-category" class="text-lg font-medium text-[#1a1a1a]">Shop by Category</h2>
-                <p class="mt-1 text-sm text-[#6f6a64]">Explore specialized digital capabilities for your specific growth needs.</p>
+                <h2 id="shop-by-category" class="text-2xl font-semibold tracking-tight text-[#1a1a1a] sm:text-3xl">Shop by Category</h2>
+                <p class="mt-2 max-w-xl text-sm leading-relaxed text-[#5c574f] sm:text-base">Explore specialized digital capabilities for your specific growth needs.</p>
             </div>
-            <a href="{{ route('categories.index') }}" class="shrink-0 text-sm font-medium text-[#c4a035]">
+            <a href="{{ route('categories.index') }}" class="shrink-0 text-sm font-semibold tracking-wide text-[#a68420] hover:text-[#8a6914]">
                 View All
                 <span aria-hidden="true">→</span>
             </a>
@@ -23,7 +23,7 @@
                             >
                         @endif
                     </span>
-                    <span class="mt-3 block text-sm text-[#1a1a1a]">{{ $category->name }}</span>
+                    <span class="mt-4 block text-[15px] font-semibold leading-snug tracking-tight text-[#1a1a1a] sm:text-base">{{ $category->name }}</span>
                 </a>
             @endforeach
         </div>

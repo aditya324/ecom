@@ -3,10 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @include('partials.favicon')
     <title>@yield('title') — {{ config('app.name', 'Sunrise') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-[#f6f3ee] text-[#1c1c1c] antialiased">
+<body class="min-h-screen bg-[#f6f3ee] text-[#1c1c1c] antialiased ">
     <div class="flex min-h-screen">
         <aside class="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-[#111111] text-white md:flex">
             <a href="{{ route('admin.home') }}" class="flex items-center gap-3 px-5 py-6">
@@ -77,17 +78,18 @@
                 <div>
                     <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">Sales</p>
                     <div class="mt-2">
-                        <a href="{{ route('admin.orders.index') }}" @class([
+                        <a href="{{ route('admin.orders.index', ['status' => 'placed']) }}" @class([
                             'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                             'bg-[#f5b400] text-[#1a1a1a]' => request()->routeIs('admin.orders.*'),
                             'text-white/70 hover:bg-white/5 hover:text-white' => ! request()->routeIs('admin.orders.*'),
-                        ])>
+                        ]) @if ($waiting['orders'] > 0) aria-label="Orders, {{ $waiting['orders'] }} waiting" @endif>
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
                                 <path d="M3 6h18"/>
                                 <path d="M16 10a4 4 0 0 1-8 0"/>
                             </svg>
                             Orders
+                            @include('admin.partials.waiting-badge', ['count' => $waiting['orders'], 'active' => request()->routeIs('admin.orders.*'), 'push' => true])
                         </a>
                         <a href="{{ route('admin.customers.index') }}" @class([
                             'mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -141,15 +143,16 @@
                 <div>
                     <p class="px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">Requests</p>
                     <div class="mt-2">
-                        <a href="{{ route('admin.quotes.index') }}" @class([
+                        <a href="{{ route('admin.quotes.index', ['status' => 'new']) }}" @class([
                             'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                             'bg-[#f5b400] text-[#1a1a1a]' => request()->routeIs('admin.quotes.*'),
                             'text-white/70 hover:bg-white/5 hover:text-white' => ! request()->routeIs('admin.quotes.*'),
-                        ])>
+                        ]) @if ($waiting['quotes'] > 0) aria-label="Quotes, {{ $waiting['quotes'] }} waiting" @endif>
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                             </svg>
                             Quotes
+                            @include('admin.partials.waiting-badge', ['count' => $waiting['quotes'], 'active' => request()->routeIs('admin.quotes.*'), 'push' => true])
                         </a>
                         <a href="{{ route('admin.reviews.index') }}" @class([
                             'mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -161,17 +164,18 @@
                             </svg>
                             Reviews
                         </a>
-                        <a href="{{ route('admin.support.index') }}" @class([
+                        <a href="{{ route('admin.support.index', ['status' => 'new']) }}" @class([
                             'mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
                             'bg-[#f5b400] text-[#1a1a1a]' => request()->routeIs('admin.support.*'),
                             'text-white/70 hover:bg-white/5 hover:text-white' => ! request()->routeIs('admin.support.*'),
-                        ])>
+                        ]) @if ($waiting['support'] > 0) aria-label="Support, {{ $waiting['support'] }} waiting" @endif>
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M4 14v-1a8 8 0 0 1 16 0v1"/>
                                 <rect x="3" y="14" width="4" height="6" rx="1"/>
                                 <rect x="17" y="14" width="4" height="6" rx="1"/>
                             </svg>
                             Support
+                            @include('admin.partials.waiting-badge', ['count' => $waiting['support'], 'active' => request()->routeIs('admin.support.*'), 'push' => true])
                         </a>
                         <a href="{{ route('admin.business.edit') }}" @class([
                             'mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
@@ -206,14 +210,14 @@
                     <a href="{{ route('admin.categories.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.categories.*')])>Categories</a>
                     <a href="{{ route('admin.services.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.services.*')])>Services</a>
                     <a href="{{ route('admin.packages.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.packages.*')])>Packages</a>
-                    <a href="{{ route('admin.orders.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.orders.*')])>Orders</a>
+                    <a href="{{ route('admin.orders.index', ['status' => 'placed']) }}" @class(['inline-flex items-center gap-1.5 font-semibold text-[#1a1a1a]' => request()->routeIs('admin.orders.*'), 'inline-flex items-center gap-1.5' => ! request()->routeIs('admin.orders.*')])>Orders @include('admin.partials.waiting-badge', ['count' => $waiting['orders'], 'active' => false])</a>
                     <a href="{{ route('admin.customers.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.customers.*')])>Customers</a>
                     <a href="{{ route('admin.carts.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.carts.*')])>Carts</a>
                     <a href="{{ route('admin.wishlists.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.wishlists.*')])>Wishlists</a>
                     <a href="{{ route('admin.coupons.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.coupons.*')])>Coupons</a>
-                    <a href="{{ route('admin.quotes.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.quotes.*')])>Quotes</a>
+                    <a href="{{ route('admin.quotes.index', ['status' => 'new']) }}" @class(['inline-flex items-center gap-1.5 font-semibold text-[#1a1a1a]' => request()->routeIs('admin.quotes.*'), 'inline-flex items-center gap-1.5' => ! request()->routeIs('admin.quotes.*')])>Quotes @include('admin.partials.waiting-badge', ['count' => $waiting['quotes'], 'active' => false])</a>
                     <a href="{{ route('admin.reviews.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.reviews.*')])>Reviews</a>
-                    <a href="{{ route('admin.support.index') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.support.*')])>Support</a>
+                    <a href="{{ route('admin.support.index', ['status' => 'new']) }}" @class(['inline-flex items-center gap-1.5 font-semibold text-[#1a1a1a]' => request()->routeIs('admin.support.*'), 'inline-flex items-center gap-1.5' => ! request()->routeIs('admin.support.*')])>Support @include('admin.partials.waiting-badge', ['count' => $waiting['support'], 'active' => false])</a>
                     <a href="{{ route('admin.business.edit') }}" @class(['font-semibold text-[#1a1a1a]' => request()->routeIs('admin.business.*')])>Business</a>
                     <form method="POST" action="{{ route('admin.logout') }}">
                         @csrf

@@ -115,4 +115,18 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Support inbox
+    |--------------------------------------------------------------------------
+    |
+    | New quote requests and support messages are sent here. The business
+    | email is used when this address is left empty.
+    |
+    */
+
+    'support' => [
+        'address' => env('SUPPORT_EMAIL'),
+    ],
+
 ];

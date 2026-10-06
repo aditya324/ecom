@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @include('partials.favicon')
     <title>Checkout — {{ config('app.name', 'Sunrise') }}</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])

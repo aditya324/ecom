@@ -26,7 +26,7 @@
     <form method="POST" action="{{ route('admin.quotes.update', $quote) }}" class="mt-6 grid max-w-2xl gap-4">
         @csrf
         @method('PUT')
-        <p class="text-sm text-[#6f6a64]">The price and reply are emailed to {{ $quote->email }}. Both are required.</p>
+        <p class="text-sm text-[#6f6a64]">The price is before 18% GST. The email to {{ $quote->email }} includes the reply and a link to pay. Both fields are required.</p>
         <div>
             <label for="quoted_price" class="text-sm font-medium text-[#1a1a1a]">Your price</label>
             <input id="quoted_price" name="quoted_price" type="number" min="0" step="0.01" value="{{ old('quoted_price', $quote->quoted_price) }}" required class="mt-1.5 w-full rounded-xl border border-[#e4e0da] bg-white px-4 py-3 text-sm outline-none focus:border-[#f5b400]">

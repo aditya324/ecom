@@ -7,12 +7,14 @@ use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\PaymentRequest;
 use App\Mail\InvoiceMail;
 use App\Mail\RefundMail;
+use App\Mail\SubscriptionPaymentMail;
 use App\Models\CartDrop;
 use App\Models\CartItem;
 use App\Models\Coupon;
 use App\Models\CouponUse;
 use App\Models\Order;
 use App\Models\Plan;
+use App\Models\Quote;
 use App\Models\Service;
 use App\Models\Subscription;
 use App\Support\Bill;
@@ -66,6 +68,10 @@ class CheckoutController extends Controller
             return $this->planCreate($request);
         }
 
+        if (($request->session()->get('checkout.source')) === 'quote') {
+            return $this->quoteCreate($request);
+        }
+
         $items = $this->items($request);
 
         if ($items === []) {
@@ -85,6 +91,10 @@ class CheckoutController extends Controller
     {
         if (($request->session()->get('checkout.source')) === 'plan') {
             return $this->storePlan($request, $razorpay);
+        }
+
+        if (($request->session()->get('checkout.source')) === 'quote') {
+            return $this->storeQuote($request, $razorpay);
         }
 
         $items = $this->items($request);
@@ -372,11 +382,16 @@ class CheckoutController extends Controller
         }
 
         $shortUrl = is_string($entity['short_url'] ?? null) && $entity['short_url'] !== '' ? $entity['short_url'] : $subscription->short_url;
+        $shouldMail = in_array($status, ['past_due', 'halted'], true) && $subscription->status !== $status;
 
         $subscription->update([
             'status' => $status,
             'short_url' => $shortUrl,
         ]);
+
+        if ($shouldMail) {
+            SubscriptionPaymentMail::deliver($subscription);
+        }
     }
 
     /**
@@ -434,6 +449,7 @@ class CheckoutController extends Controller
         $order = Order::query()->create([
             'number' => $this->number(),
             'user_id' => $subscription->user_id,
+            'subscription_id' => $subscription->id,
             'name' => $source->name,
             'email' => $source->email,
             'billing_address' => $source->billing_address,
@@ -464,7 +480,7 @@ class CheckoutController extends Controller
 
     private function forgetCartLines(Order $order): void
     {
-        if ($order->user_id === null) {
+        if ($order->user_id === null || $order->quote_id !== null) {
             return;
         }
 
@@ -810,6 +826,138 @@ class CheckoutController extends Controller
         $this->retireUnpaid($request, $razorpay, [$order->id]);
 
         return $this->payload($razorpay, $order, $steps);
+    }
+
+    private function quoteCreate(Request $request): View|RedirectResponse
+    {
+        $quote = $this->selectedQuote($request);
+
+        if ($quote === null) {
+            $request->session()->forget('checkout');
+
+            return redirect()->route('home');
+        }
+
+        $paid = $quote->paidOrder();
+
+        if ($paid !== null) {
+            $request->session()->forget('checkout');
+
+            if ($paid->user_id === $request->user()->id) {
+                return redirect()->route('orders.show', $paid);
+            }
+
+            return redirect()->route('home');
+        }
+
+        $taxable = (int) round((float) $quote->quoted_price);
+
+        return view('checkout.create', [
+            'items' => [[
+                'service' => $quote->service,
+                'label' => 'Custom quote',
+                'price' => $taxable,
+            ]],
+            'bill' => [
+                'discount' => 0,
+                'code' => null,
+                'gst' => Bill::gstOn($taxable),
+                'total' => $taxable + Bill::gstOn($taxable),
+            ],
+            'hasSubscription' => false,
+        ]);
+    }
+
+    private function storeQuote(CheckoutRequest $request, Razorpay $razorpay): JsonResponse
+    {
+        $quote = $this->selectedQuote($request);
+
+        if ($quote === null) {
+            return response()->json(['message' => 'This quote is no longer available.'], 422);
+        }
+
+        if ($quote->paidOrder() !== null) {
+            return response()->json(['message' => 'This quote is already paid.'], 422);
+        }
+
+        $taxable = (int) round((float) $quote->quoted_price);
+        $gst = Bill::gstOn($taxable);
+
+        if ($taxable + $gst < 1) {
+            return response()->json(['message' => 'This order cannot be paid online.'], 422);
+        }
+
+        $existing = Order::query()
+            ->where('user_id', $request->user()->id)
+            ->where('quote_id', $quote->id)
+            ->where('status', 'pending')
+            ->whereNull('razorpay_payment_id')
+            ->whereNotNull('razorpay_order_id')
+            ->first();
+
+        if ($existing !== null && (int) round((float) $existing->total) === $taxable + $gst) {
+            $existing->update($this->customerFrom($request));
+            $this->retireUnpaid($request, $razorpay, [$existing->id]);
+
+            return $this->payload($razorpay, $existing, [$this->stepFrom($existing)]);
+        }
+
+        $order = Order::query()->create([
+            'number' => $this->number(),
+            'user_id' => $request->user()->id,
+            'quote_id' => $quote->id,
+            ...$this->customerFrom($request),
+            'status' => 'pending',
+            'discount' => 0,
+            'gst' => $gst,
+            'total' => $taxable + $gst,
+        ]);
+
+        $order->items()->create([
+            'service_id' => $quote->service_id,
+            'service_name' => $quote->service->name,
+            'duration_label' => 'Custom quote',
+            'months' => null,
+            'price' => $taxable,
+            'discount' => 0,
+            'gst' => $gst,
+        ]);
+
+        try {
+            $amount = ($taxable + $gst) * 100;
+            $razorpayOrderId = $razorpay->createOrder($order, $amount);
+            $order->update([
+                'razorpay_order_id' => $razorpayOrderId,
+                'razorpay_amount' => $amount,
+            ]);
+        } catch (Throwable $exception) {
+            $order->delete();
+            report($exception);
+
+            return response()->json(['message' => $this->paymentError($exception)], 502);
+        }
+
+        $this->retireUnpaid($request, $razorpay, [$order->id]);
+
+        return $this->payload($razorpay, $order->fresh(), [$this->stepFrom($order->fresh())]);
+    }
+
+    private function selectedQuote(Request $request): ?Quote
+    {
+        $id = $request->session()->get('checkout.quote_id');
+
+        if (! is_numeric($id)) {
+            return null;
+        }
+
+        return Quote::query()
+            ->with('service')
+            ->whereKey($id)
+            ->where('status', 'replied')
+            ->whereNotNull('quoted_price')
+            ->whereNotNull('pay_token')
+            ->whereHas('service')
+            ->first();
     }
 
     private function selectedPlan(Request $request): ?Plan
@@ -1207,7 +1355,7 @@ class CheckoutController extends Controller
 
     private function releasePaidLines(Request $request, Order $order): void
     {
-        if (in_array($request->session()->get('checkout.source'), ['buy', 'plan'], true)) {
+        if (in_array($request->session()->get('checkout.source'), ['buy', 'plan', 'quote'], true)) {
             return;
         }
 
@@ -1226,7 +1374,7 @@ class CheckoutController extends Controller
     {
         $source = $request->session()->get('checkout.source');
 
-        if (in_array($source, ['buy', 'plan'], true)) {
+        if (in_array($source, ['buy', 'plan', 'quote'], true)) {
             $request->session()->forget('checkout');
         } else {
             (new Cart($request))->clear();

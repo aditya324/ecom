@@ -2,9 +2,17 @@
 
 namespace App\Providers;
 
+use App\Models\CartItem;
 use App\Models\Category;
+use App\Models\Coupon;
+use App\Models\Order;
 use App\Models\Plan;
+use App\Models\Quote;
+use App\Models\Review;
 use App\Models\Service;
+use App\Models\SupportMessage;
+use App\Models\User;
+use App\Models\WishlistItem;
 use App\Support\Cart;
 use App\Support\Wishlist;
 use Illuminate\Support\Facades\View;
@@ -61,6 +69,27 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['partials.store-service-card', 'services.show'], function ($view): void {
             $view->with('wishlistIds', (new Wishlist(request()))->ids());
+        });
+
+        View::composer(['admin.layout', 'admin.home'], function ($view): void {
+            $view->with('waiting', once(function (): array {
+                $distinctUsers = fn (string $table): int => (int) $table::query()->selectRaw('count(distinct user_id) as aggregate')->value('aggregate');
+
+                return [
+                    'categories' => Category::query()->count(),
+                    'services' => Service::query()->count(),
+                    'hidden' => Service::query()->where('is_active', false)->count(),
+                    'packages' => Plan::query()->count(),
+                    'orders' => Order::query()->where('status', 'placed')->count(),
+                    'customers' => User::query()->count(),
+                    'carts' => $distinctUsers(CartItem::class),
+                    'wishlists' => $distinctUsers(WishlistItem::class),
+                    'coupons' => Coupon::query()->count(),
+                    'quotes' => Quote::query()->where('status', 'new')->count(),
+                    'reviews' => Review::query()->count(),
+                    'support' => SupportMessage::query()->where('status', 'new')->count(),
+                ];
+            }));
         });
 
         View::composer('partials.store-plans', function ($view): void {

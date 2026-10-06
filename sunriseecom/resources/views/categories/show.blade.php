@@ -18,6 +18,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @include('partials.favicon')
     <title>{{ $category ? $category->name.' Services' : 'All Services' }} — {{ config('app.name', 'Sunrise') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -54,8 +55,22 @@
                     <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ $category ? $category->name.' Services' : 'All Services' }}</h1>
                     <p class="mt-2 text-sm text-[#6f6a64]">{{ $category?->tagline ?: ($category ? 'Browse '.$category->name.' services from the Sunrise marketplace.' : 'Browse every service from the Sunrise marketplace.') }}</p>
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex flex-wrap items-center gap-3">
                     <p class="text-sm text-[#6f6a64]">{{ number_format($services->total()) }} {{ \Illuminate\Support\Str::plural('Service', $services->total()) }} Available</p>
+                    @php
+                        $activeFilters = count($filters['categories']) + count($filters['types']) + ($filters['rating'] ? 1 : 0) + (($filters['min'] !== null || $filters['max'] !== null) ? 1 : 0);
+                    @endphp
+                    <button type="button" data-catalog-panel-open aria-expanded="false" aria-controls="catalog-panel" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#efe8dc] bg-white px-3 text-sm font-medium shadow-sm lg:hidden">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 6h16"/>
+                            <path d="M7 12h10"/>
+                            <path d="M10 18h4"/>
+                        </svg>
+                        Filters
+                        @if ($activeFilters > 0)
+                            <span class="grid h-5 min-w-5 place-items-center rounded-full bg-[#f5b400] px-1 text-[11px] font-bold leading-none text-[#1a1a1a]">{{ $activeFilters }}</span>
+                        @endif
+                    </button>
                     <label class="inline-flex items-center gap-2 rounded-xl border border-[#efe8dc] bg-white px-3 py-2 text-sm shadow-sm">
                         <span class="text-[#8a8680]">Sort:</span>
                         <select name="sort" form="catalog-filters" class="bg-transparent font-medium outline-none">
@@ -69,10 +84,20 @@
             </div>
 
             <div class="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-                <aside class="w-full shrink-0 rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(28,28,28,0.04)] lg:sticky lg:top-6 lg:w-72">
+                <aside id="catalog-panel" data-catalog-panel class="max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:hidden lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
+                    <button type="button" data-catalog-panel-close class="absolute inset-0 bg-[#111111]/50 lg:hidden" aria-label="Close filters"></button>
+                    <div class="relative ml-auto h-full w-full max-w-sm overflow-y-auto bg-white p-5 shadow-[0_8px_30px_rgba(28,28,28,0.04)] lg:ml-0 lg:h-auto lg:max-w-none lg:rounded-2xl">
                     <div class="flex items-center justify-between">
                         <h2 class="text-lg font-semibold">Filters</h2>
-                        <a href="{{ $catalogUrl }}" class="text-sm font-medium text-[#e07a2f]">Clear All</a>
+                        <div class="flex items-center gap-3">
+                            <a href="{{ $catalogUrl }}" class="text-sm font-medium text-[#e07a2f]">Clear All</a>
+                            <button type="button" data-catalog-panel-close class="grid h-8 w-8 place-items-center rounded-full text-[#1a1a1a] hover:bg-[#f7f4ef] lg:hidden" aria-label="Close filters">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M18 6 6 18"/>
+                                    <path d="m6 6 12 12"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     @if ($categoryFilters->isNotEmpty() || $moreCategoryFilters->isNotEmpty())
@@ -162,6 +187,7 @@
                             @endforeach
                         </div>
                     </details>
+                    </div>
                 </aside>
 
                 <div class="min-w-0 flex-1">
