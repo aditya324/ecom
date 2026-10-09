@@ -61,7 +61,7 @@
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M4 7h16"/>
                     <path d="M4 12h16"/>
-                    <path d="M4 17h16"/>
+                    <path d="M4 17h16"/>   
                 </svg>
                 @if (($wishlistCount ?? 0) + ($cartCount ?? 0) > 0)
                     <span class="absolute top-0.5 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#f5b400] px-1 text-[10px] font-bold leading-none text-[#1a1a1a] ring-2 ring-[#111111]">{{ ($wishlistCount ?? 0) + ($cartCount ?? 0) }}</span>
